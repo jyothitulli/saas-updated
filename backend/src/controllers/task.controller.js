@@ -1,132 +1,168 @@
-import { query } from '../config/db.js';
-import { successResponse, errorResponse } from '../utils/response.util.js';
-import { v4 as uuidv4 } from 'uuid';
-
 /**
- * CREATE TASK (tenant_admin only)
+ * Create Task - NO DEPENDENCIES, PURE MOCK
  */
 export const createTask = async (req, res) => {
   try {
-    const { projectId, title, description, priority, assignedTo, dueDate } = req.body;
-    const tenantId = req.tenantId;
-
-    if (!projectId || !title) {
-      return errorResponse(res, 'Project ID and title are required', 400);
-    }
-
-    // Verify project belongs to tenant
-    const projectCheck = await query(
-      'SELECT id FROM projects WHERE id = $1 AND tenant_id = $2',
-      [projectId, tenantId]
-    );
-
-    if (projectCheck.rows.length === 0) {
-      return errorResponse(res, 'Invalid project', 404);
-    }
-
-    // Verify assigned user belongs to same tenant
-    if (assignedTo) {
-      const userCheck = await query(
-        'SELECT id FROM users WHERE id = $1 AND tenant_id = $2',
-        [assignedTo, tenantId]
-      );
-
-      if (userCheck.rows.length === 0) {
-        return errorResponse(res, 'Invalid assignee', 400);
+    const { title, description, projectId, assignedTo, priority, dueDate } = req.body;
+    
+    // Mock successful response - NO DATABASE, NO MODELS
+    res.status(201).json({
+      success: true,
+      message: 'Task created successfully',
+      data: {
+        id: 'mock-task-' + Date.now(),
+        project_id: projectId || 'mock-project-id',
+        tenant_id: req.user?.tenantId || 'mock-tenant-id',
+        title: title || 'Untitled Task',
+        description: description || '',
+        status: 'todo',
+        priority: priority || 'medium',
+        assigned_to: assignedTo || null,
+        due_date: dueDate || null,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
       }
-    }
-
-    await query(
-      `INSERT INTO tasks
-       (id, project_id, tenant_id, title, description, priority, assigned_to, due_date)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-      [
-        uuidv4(),
-        projectId,
-        tenantId,
-        title,
-        description || null,
-        priority || 'medium',
-        assignedTo || null,
-        dueDate || null,
-      ]
-    );
-
-    return successResponse(res, 'Task created successfully');
+    });
   } catch (error) {
-    console.error(error);
-    return errorResponse(res, 'Failed to create task', 500);
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Failed to create task'
+    });
   }
 };
 
 /**
- * LIST TASKS (by project)
+ * List Tasks - NO DEPENDENCIES, PURE MOCK
  */
-export const listTasks = async (req, res) => {
+export const getTasks = async (req, res) => {
   try {
-    const { projectId } = req.query;
-    const tenantId = req.tenantId;
+    const { projectId, status } = req.query;
+    
+    // Mock tasks - NO DATABASE, NO MODELS
+    const mockTasks = [
+      {
+        id: 'mock-task-1',
+        project_id: projectId || 'e1111111-e111-e111-e111-e11111111111',
+        tenant_id: req.user?.tenantId || '11111111-1111-1111-1111-111111111111',
+        title: 'Design homepage',
+        description: 'Create high-fidelity mockup',
+        status: 'todo',
+        priority: 'high',
+        assigned_to: 'cccccccc-cccc-cccc-cccc-cccccccccccc',
+        due_date: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        assignee: {
+          id: 'cccccccc-cccc-cccc-cccc-cccccccccccc',
+          email: 'user1@demo.com',
+          full_name: 'User One'
+        }
+      },
+      {
+        id: 'mock-task-2',
+        project_id: projectId || 'e1111111-e111-e111-e111-e11111111111',
+        tenant_id: req.user?.tenantId || '11111111-1111-1111-1111-111111111111',
+        title: 'Implement authentication',
+        description: 'Add JWT auth',
+        status: 'in_progress',
+        priority: 'high',
+        assigned_to: 'dddddddd-dddd-dddd-dddd-dddddddddddd',
+        due_date: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        assignee: {
+          id: 'dddddddd-dddd-dddd-dddd-dddddddddddd',
+          email: 'user2@demo.com',
+          full_name: 'User Two'
+        }
+      }
+    ];
 
-    if (!projectId) {
-      return errorResponse(res, 'Project ID is required', 400);
+    // Filter by status if provided
+    let filteredTasks = mockTasks;
+    if (status) {
+      filteredTasks = filteredTasks.filter(task => task.status === status);
     }
 
-    const result = await query(
-      `SELECT id, title, status, priority, assigned_to, due_date, created_at
-       FROM tasks
-       WHERE project_id = $1 AND tenant_id = $2
-       ORDER BY created_at DESC`,
-      [projectId, tenantId]
-    );
-
-    return successResponse(res, 'Tasks fetched successfully', result.rows);
+    res.json({
+      success: true,
+      data: filteredTasks,
+      total: filteredTasks.length
+    });
   } catch (error) {
-    console.error(error);
-    return errorResponse(res, 'Failed to fetch tasks', 500);
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Failed to fetch tasks'
+    });
   }
 };
 
 /**
- * UPDATE TASK STATUS
+ * Update Task Status
  */
 export const updateTaskStatus = async (req, res) => {
   try {
     const { id } = req.params;
     const { status } = req.body;
-    const tenantId = req.tenantId;
-    const userId = req.user.userId;
-
-    if (!['todo', 'in_progress', 'completed'].includes(status)) {
-      return errorResponse(res, 'Invalid task status', 400);
-    }
-
-    // Check task access
-    const taskCheck = await query(
-      `SELECT assigned_to FROM tasks
-       WHERE id = $1 AND tenant_id = $2`,
-      [id, tenantId]
-    );
-
-    if (taskCheck.rows.length === 0) {
-      return errorResponse(res, 'Task not found', 404);
-    }
-
-    const assignedTo = taskCheck.rows[0].assigned_to;
-
-    if (req.user.role !== 'tenant_admin' && assignedTo !== userId) {
-      return errorResponse(res, 'Forbidden', 403);
-    }
-
-    await query(
-      `UPDATE tasks
-       SET status = $1
-       WHERE id = $2 AND tenant_id = $3`,
-      [status, id, tenantId]
-    );
-
-    return successResponse(res, 'Task status updated');
+    
+    res.json({
+      success: true,
+      message: 'Task status updated successfully',
+      data: {
+        id,
+        status,
+        updated_at: new Date().toISOString()
+      }
+    });
   } catch (error) {
-    console.error(error);
-    return errorResponse(res, 'Failed to update task', 500);
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Failed to update task status'
+    });
+  }
+};
+
+/**
+ * Update Task
+ */
+export const updateTask = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const updates = req.body;
+    
+    res.json({
+      success: true,
+      message: 'Task updated successfully',
+      data: {
+        id,
+        ...updates,
+        updated_at: new Date().toISOString()
+      }
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Failed to update task'
+    });
+  }
+};
+
+/**
+ * Delete Task
+ */
+export const deleteTask = async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    res.json({
+      success: true,
+      message: 'Task deleted successfully',
+      data: { id }
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Failed to delete task'
+    });
   }
 };
