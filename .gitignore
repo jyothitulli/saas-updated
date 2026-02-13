@@ -1,18 +1,38 @@
-# Node
+# Dependency directories
 node_modules/
-npm-debug.log*
+package-lock.json
+yarn.lock
 
 # Environment files
 .env
-
 .env.local
+.env.production
 
 # Build outputs
-build/
 dist/
+build/
+*.log
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
 
 # OS files
 .DS_Store
+Thumbs.db
 
-# Docker logs
-*.log
+# Docker volumes
+data/
+postgres-data/
+
+# Random files in root (prevent this mistake)
+*.js
+!backend/src/**/*.js
+!frontend/src/**/*.js
+!database/init/*.sql
+!*.config.js
+!tailwind.config.js
+!next.config.js
