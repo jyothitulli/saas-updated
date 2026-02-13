@@ -1,79 +1,184 @@
-System Architecture Design
-1. System Architecture Diagram
-![System Architecture Diagram]
-(./images/system-architecture.png)
+\# Architecture
 
 
-The high-level system architecture consists of the following components:
 
-Client (Browser): The interface through which end users interact with the application.
+\## System Architecture Diagram
 
-Frontend Application: Handles the user interface, renders views, and communicates with the backend API.
+\- Browser (React SPA) → Backend (Express API) → PostgreSQL (database)
 
-Backend API Server: Provides business logic, handles requests from the frontend, and interacts with the database.
+\- JWT Auth flow: Login issues token; subsequent requests include Authorization: Bearer <token>
 
-Database: Stores all persistent data, including tenant-specific data and user information.
-
-Authentication Flow: Ensures secure access via login, JWT tokens, and role-based authorization.
-
-Diagram:
+\- CORS allows origin FRONTEND\_URL; services communicate via Docker service names
 
 
-2. Database Schema Design
-(./images/database-erd.png)
-The database schema is designed to support multi-tenant isolation and maintain data integrity.
 
-Key Features:
-
-All tables that store tenant-specific data include a tenant_id column for isolation.
-
-Foreign keys and indexes are highlighted to optimize relationships and query performance.
-
-Tables include Users, Tenants, Projects, Tasks, and related entities.
-
-Entity Relationship Diagram (ERD):
+A Mermaid diagram is included below; export to PNG for final docs:
 
 
-Highlights:
 
-Foreign Keys: Clearly marked to indicate relationships between tables.
+```mermaid
 
-Indexes: Applied on frequently queried columns to improve performance.
+graph LR
 
-Tenant Isolation: tenant_id present in all relevant tables to ensure data separation.
+&nbsp; A\[Browser] -->|HTTP 3000| B\[Frontend]
 
-3. API Architecture
+&nbsp; B -->|HTTP 5000 /api| C\[Backend]
 
-The system provides a RESTful API with role-based access control. Endpoints are organized by module:
+&nbsp; C -->|5432| D\[(PostgreSQL)]
 
-3.1 Auth Module
-Endpoint	Method	Auth Required	Role Required	Description
-/api/auth/register	POST	No	N/A	Register new user
-/api/auth/login	POST	No	N/A	Login user and return JWT
-/api/auth/logout	POST	Yes	Any	Logout current user
-/api/auth/refresh	POST	Yes	Any	Refresh JWT token
-3.2 Tenants Module
-Endpoint	Method	Auth Required	Role Required	Description
-/api/tenants	GET	Yes	Super Admin	List all tenants
-/api/tenants	POST	Yes	Super Admin	Create new tenant
-/api/tenants/:id	PUT	Yes	Super Admin	Update tenant details
-/api/tenants/:id	DELETE	Yes	Super Admin	Delete tenant
-3.3 Users Module
-Endpoint	Method	Auth Required	Role Required	Description
-/api/users	GET	Yes	Tenant Admin	List users in tenant
-/api/users	POST	Yes	Tenant Admin	Create new user
-/api/users/:id	PUT	Yes	Tenant Admin	Update user details
-/api/users/:id	DELETE	Yes	Tenant Admin	Remove user from tenant
-3.4 Projects Module
-Endpoint	Method	Auth Required	Role Required	Description
-/api/projects	GET	Yes	Any	List projects in tenant
-/api/projects	POST	Yes	Tenant Admin	Create new project
-/api/projects/:id	PUT	Yes	Tenant Admin	Update project details
-/api/projects/:id	DELETE	Yes	Tenant Admin	Delete project
-3.5 Tasks Module
-Endpoint	Method	Auth Required	Role Required	Description
-/api/tasks	GET	Yes	Any	List tasks in project
-/api/tasks	POST	Yes	Any	Create new task
-/api/tasks/:id	PUT	Yes	Any	Update task details
-/api/tasks/:id	DELETE	Yes	Tenant Admin	Delete task
-/api/tasks/:id/comments	POST	Yes	Any	Add comment to task
+&nbsp; C -.->|JWT| A
+
+```
+
+
+
+\## Database ERD
+
+```mermaid
+
+erDiagram
+
+&nbsp; tenants ||--o{ users : has
+
+&nbsp; tenants ||--o{ projects : has
+
+&nbsp; tenants ||--o{ audit\_logs : has
+
+&nbsp; projects ||--o{ tasks : has
+
+&nbsp; users ||--o{ projects : created\_by
+
+&nbsp; users ||--o{ tasks : assigned\_to
+
+
+
+&nbsp; tenants {
+
+&nbsp;   uuid id PK
+
+&nbsp;   string name
+
+&nbsp;   string subdomain
+
+&nbsp;   enum status
+
+&nbsp;   enum subscription\_plan
+
+&nbsp;   int max\_users
+
+&nbsp;   int max\_projects
+
+&nbsp;   timestamptz created\_at
+
+&nbsp;   timestamptz updated\_at
+
+&nbsp; }
+
+&nbsp; users {
+
+&nbsp;   uuid id PK
+
+&nbsp;   uuid tenant\_id FK
+
+&nbsp;   string email
+
+&nbsp;   string password\_hash
+
+&nbsp;   string full\_name
+
+&nbsp;   enum role
+
+&nbsp;   bool is\_active
+
+&nbsp;   timestamptz created\_at
+
+&nbsp;   timestamptz updated\_at
+
+&nbsp; }
+
+&nbsp; projects {
+
+&nbsp;   uuid id PK
+
+&nbsp;   uuid tenant\_id FK
+
+&nbsp;   string name
+
+&nbsp;   text description
+
+&nbsp;   enum status
+
+&nbsp;   uuid created\_by FK
+
+&nbsp;   timestamptz created\_at
+
+&nbsp;   timestamptz updated\_at
+
+&nbsp; }
+
+&nbsp; tasks {
+
+&nbsp;   uuid id PK
+
+&nbsp;   uuid project\_id FK
+
+&nbsp;   uuid tenant\_id FK
+
+&nbsp;   string title
+
+&nbsp;   text description
+
+&nbsp;   enum status
+
+&nbsp;   enum priority
+
+&nbsp;   uuid assigned\_to FK
+
+&nbsp;   date due\_date
+
+&nbsp;   timestamptz created\_at
+
+&nbsp;   timestamptz updated\_at
+
+&nbsp; }
+
+&nbsp; audit\_logs {
+
+&nbsp;   uuid id PK
+
+&nbsp;   uuid tenant\_id FK
+
+&nbsp;   uuid user\_id FK
+
+&nbsp;   string action
+
+&nbsp;   string entity\_type
+
+&nbsp;   string entity\_id
+
+&nbsp;   string ip\_address
+
+&nbsp;   timestamptz created\_at
+
+&nbsp; }
+
+```
+
+
+
+\## API Architecture
+
+\- Auth: POST /api/auth/register-tenant, POST /api/auth/login, GET /api/auth/me, POST /api/auth/logout
+
+\- Tenants: GET /api/tenants/:tenantId, PUT /api/tenants/:tenantId, GET /api/tenants (super\_admin)
+
+\- Users: POST /api/tenants/:tenantId/users, GET /api/tenants/:tenantId/users, PUT /api/users/:userId, DELETE /api/users/:userId
+
+\- Projects: POST /api/projects, GET /api/projects, PUT /api/projects/:projectId, DELETE /api/projects/:projectId
+
+\- Tasks: POST /api/projects/:projectId/tasks, GET /api/projects/:projectId/tasks, PATCH /api/tasks/:taskId/status, PUT /api/tasks/:taskId
+
+
+
+Auth requirements and roles are enforced per endpoint as specified. 
+
