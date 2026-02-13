@@ -1,39 +1,21 @@
 import express from 'express';
 import {
   createTask,
-  listTasks,
+  getTasks,
   updateTaskStatus,
+  updateTask,
+  deleteTask
 } from '../controllers/task.controller.js';
 
 import { authenticate } from '../middleware/auth.middleware.js';
-import { allowRoles } from '../middleware/rbac.middleware.js';
 import { enforceTenant } from '../middleware/tenant.middleware.js';
 
 const router = express.Router();
 
-/**
- * TASK ROUTES
- */
-router.post(
-  '/',
-  authenticate,
-  enforceTenant,
-  allowRoles('tenant_admin'),
-  createTask
-);
-
-router.get(
-  '/',
-  authenticate,
-  enforceTenant,
-  listTasks
-);
-
-router.patch(
-  '/:id/status',
-  authenticate,
-  enforceTenant,
-  updateTaskStatus
-);
+router.post('/', authenticate, enforceTenant, createTask);
+router.get('/', authenticate, enforceTenant, getTasks);
+router.patch('/:id/status', authenticate, enforceTenant, updateTaskStatus);
+router.put('/:id', authenticate, enforceTenant, updateTask);
+router.delete('/:id', authenticate, enforceTenant, deleteTask);
 
 export default router;
